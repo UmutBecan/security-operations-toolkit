@@ -1,5 +1,7 @@
 # security-operations-toolkit
 
+[![test](https://github.com/UmutB34/security-operations-toolkit/actions/workflows/test.yml/badge.svg)](https://github.com/UmutB34/security-operations-toolkit/actions/workflows/test.yml)
+
 Small, **defensive, read-only** checks for the external security posture of a
 domain: email authentication records, TLS certificates and HTTP security headers.
 
