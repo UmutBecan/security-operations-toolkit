@@ -16,5 +16,9 @@ jobs:
         with:
           node-version: 24
       - name: Verify zero runtime dependencies
-        run: node -e "const p=require('./package.json'); const d=Object.keys(p.dependencies||{}); if (d.length) { console.error('runtime dependencies found: ' + d.join(', ')); process.exit(1); }"
+        run: |
+          node -e "
+            const deps = Object.keys(require('./package.json').dependencies || {});
+            if (deps.length) { console.error('runtime dependencies found - ' + deps.join(', ')); process.exit(1); }
+          "
       - run: npm test
