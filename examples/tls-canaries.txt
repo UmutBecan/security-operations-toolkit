@@ -1,0 +1,41 @@
+# Captured 2026-09-30 — canary targets from badssl.com that are intentionally misconfigured.
+# Each must produce a FAIL; if one passes, the TLS check is broken.
+
+$ node bin/secops.mjs tls expired.badssl.com
+Target: expired.badssl.com
+
+[TLS]
+  FAIL  Certificate not trusted (CERT_HAS_EXPIRED)
+        → Serve a certificate from a public CA that covers this hostname, with the full intermediate chain.
+  FAIL  Certificate expired 4188 day(s) ago
+        valid to Apr 12 23:59:59 2015 GMT; issuer COMODO CA Limited
+  PASS  Negotiated TLSv1.2
+
+Summary: 1 pass · 0 warn · 2 fail · 0 info · 0 error
+# exit code: 2
+
+$ node bin/secops.mjs tls wrong.host.badssl.com
+Target: wrong.host.badssl.com
+
+[TLS]
+  FAIL  Certificate not trusted (ERR_TLS_CERT_ALTNAME_INVALID)
+        → Serve a certificate from a public CA that covers this hostname, with the full intermediate chain.
+  PASS  Certificate valid for 89 more day(s)
+        valid to Dec 28 20:02:55 2026 GMT; issuer Let's Encrypt
+  PASS  Negotiated TLSv1.2
+
+Summary: 2 pass · 0 warn · 1 fail · 0 info · 0 error
+# exit code: 2
+
+$ node bin/secops.mjs tls self-signed.badssl.com
+Target: self-signed.badssl.com
+
+[TLS]
+  FAIL  Certificate not trusted (DEPTH_ZERO_SELF_SIGNED_CERT)
+        → Serve a certificate from a public CA that covers this hostname, with the full intermediate chain.
+  PASS  Certificate valid for 729 more day(s)
+        valid to Sep 28 21:01:43 2028 GMT; issuer BadSSL
+  PASS  Negotiated TLSv1.2
+
+Summary: 2 pass · 0 warn · 1 fail · 0 info · 0 error
+# exit code: 2

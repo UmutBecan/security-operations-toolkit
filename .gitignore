@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.env
+.env.*
+
+# local target lists and reports
+domains.txt
+reports/
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

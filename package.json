@@ -1,0 +1,17 @@
+{
+  "name": "security-operations-toolkit",
+  "version": "0.1.0",
+  "description": "Small, defensive, read-only checks for domain, email and web security posture.",
+  "type": "module",
+  "bin": {
+    "secops": "bin/secops.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "private": true
+}
