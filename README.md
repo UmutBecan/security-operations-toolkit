@@ -6,7 +6,7 @@ Small, **defensive, read-only** checks for the external security posture of a
 domain: email authentication records, TLS certificates and HTTP security headers.
 
 Built for operations teams who want a quick, scriptable answer to
-*"is anything obviously wrong with this domain?"* — with a clear reason and a
+*"is anything obviously wrong with this domain?"*, with a clear reason and a
 remediation hint for every finding.
 
 ```text
@@ -30,8 +30,8 @@ Full sample output: [examples/example.com.txt](examples/example.com.txt)
 ## Problem
 
 Expired certificates, missing DMARC and weak HTTP headers are among the most common
-and most preventable external findings. They are usually caught late — by a customer,
-an auditor or an outage — because nobody checks them routinely.
+and most preventable external findings. They are usually caught late, by a customer,
+an auditor or an outage, because nobody checks them routinely.
 
 ## Architecture
 
@@ -49,7 +49,7 @@ Every check is split into a **lookup** (network) and a pure **evaluate** functio
 
 ## Technology
 
-- Node.js ≥ 20, standard library only — **zero runtime dependencies**
+- Node.js ≥ 20, standard library only: **zero runtime dependencies**
 - `node:dns`, `node:tls`, `fetch` for lookups
 - `node:test` for tests
 
@@ -68,8 +68,8 @@ node bin/secops.mjs headers example.com --json
 | `1` | Usage error (bad arguments or invalid domain) |
 | `2` | At least one `fail` or `error` finding |
 
-The exit codes make it usable in cron jobs and CI pipelines —
-see [examples/scheduled-check.sh](examples/scheduled-check.sh).
+The exit codes make it usable in cron jobs and CI pipelines.
+See [examples/scheduled-check.sh](examples/scheduled-check.sh).
 
 What each check covers, and what it deliberately does not: [docs/checks.md](docs/checks.md)
 
@@ -77,7 +77,7 @@ What each check covers, and what it deliberately does not: [docs/checks.md](docs
 
 - **Deterministic rules, no scoring.** Each finding is `pass / warn / fail / info / error`
   with a title, optional detail and a remediation hint.
-- **No false certainty.** Where a check cannot know something, it says so —
+- **No false certainty.** Where a check cannot know something, it says so:
   e.g. DKIM is not checked because absence cannot be proven without a selector;
   CSP presence is reported, policy strength is not graded.
 - **Canary tested.** The TLS check is verified against intentionally broken
