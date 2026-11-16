@@ -1,4 +1,4 @@
-# security-operations-toolkit v0.2.0
+# security-operations-toolkit v1.1.0
 
 Accuracy release: DMARC and MX findings now follow the current RFCs, plus CLI and CI fixes.
 
@@ -19,7 +19,7 @@ Accuracy release: DMARC and MX findings now follow the current RFCs, plus CLI an
 - `--help` and `-h` exit `0` (usage on stdout); invalid input still exits `1`.
 - The text report ends with one `Next:` hint line; `--no-hint` removes it; `--json` never contains it. Exit codes are unchanged.
 - CI tests on Node 20, 22 and 24.
-- New copyable workflow: `examples/github-actions/domain-check.yml` (weekly, pinned to `#v0.2.0`, fails on exit code 2).
+- New copyable workflow: `examples/github-actions/domain-check.yml` (weekly, pinned to `#v1.1.0`, fails on exit code 2).
 
 ## Upgrade notes
 
@@ -31,7 +31,7 @@ Accuracy release: DMARC and MX findings now follow the current RFCs, plus CLI an
 ## Run it
 
 ```bash
-npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all yourdomain.com
+npx --yes github:UmutBecan/security-operations-toolkit#v1.1.0 all yourdomain.com
 ```
 
 Full changelog: [CHANGELOG.md](../CHANGELOG.md).

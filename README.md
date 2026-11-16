@@ -42,12 +42,12 @@ Full sample output: [examples/example.com.txt](examples/example.com.txt)
 Pin a release tag so results do not change under you:
 
 ```bash
-npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all example.com
+npx --yes github:UmutBecan/security-operations-toolkit#v1.1.0 all example.com
 ```
 
 Output below was captured on 2026-11-17 with Node.js v26.13.0 by running `node bin/secops.mjs all <domain>`
-from the v0.2.0 source tree (exit code `0` for both). Certificate day counts and live DNS/HTTP data change over time.
-The `#v0.2.0` form works once that tag is published to GitHub.
+from the v1.1.0 source tree (exit code `0` for both). Certificate day counts and live DNS/HTTP data change over time.
+The `#v1.1.0` form works once that tag is published to GitHub.
 
 `example.com`:
 

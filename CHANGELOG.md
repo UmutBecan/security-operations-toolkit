@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.2.0 — 2026-11-17
+## v1.1.0 — 2026-11-17
+
+Follows the existing `v1.0.0` tag (`9f2859e`, published without release notes).
 
 ### Changed (findings)
 

@@ -25,11 +25,11 @@ jobs:
       # Pinned to a release tag so a later change to the toolkit cannot alter your results unnoticed.
       # npx exits with the toolkit's exit code: 0 ok, 1 usage error, 2 findings -> the job fails on 1 and 2.
       - name: Run checks
-        run: npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all "$DOMAIN" --no-hint
+        run: npx --yes github:UmutBecan/security-operations-toolkit#v1.1.0 all "$DOMAIN" --no-hint
       # Optional: keep a machine-readable copy even when the step above failed.
       - name: Save JSON report
         if: always()
-        run: npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all "$DOMAIN" --json > report.json || true
+        run: npx --yes github:UmutBecan/security-operations-toolkit#v1.1.0 all "$DOMAIN" --json > report.json || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

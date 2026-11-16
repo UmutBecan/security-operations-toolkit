@@ -64,7 +64,7 @@ test('DMARC: policy levels', () => {
 
 test('DMARC: pct < 100 and missing rua warn', () => {
   const r = evaluateDmarc(['v=DMARC1; p=reject; pct=50']);
-  assert.ok(has(r, 'warn', /Legacy "pct=50"/)); // wording changed in v0.2.0: RFC 9989 removed pct
+  assert.ok(has(r, 'warn', /Legacy "pct=50"/)); // wording changed in v1.1.0: RFC 9989 removed pct
   assert.ok(has(r, 'warn', /rua/));
 });
 
