@@ -1,4 +1,5 @@
 # Domains to check, one per line. Blank lines and # comments are ignored.
+# Replace these examples with domains you own or are authorized to assess.
 github.com
 google.com
 example.com   # IANA documentation domain

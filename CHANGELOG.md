@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.2.0 — unreleased
+## v1.2.0 — 2026-11-17
 
 Pipeline release: many domains in one run, SARIF for GitHub code scanning, a management report, and the
 transport-security records mail operators are asked about (MTA-STS, TLS-RPT, DKIM for known selectors).
