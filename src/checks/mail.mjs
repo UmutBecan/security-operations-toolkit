@@ -23,6 +23,18 @@ export async function lookupMx(name) {
   }
 }
 
+// A/AAAA lookup, used only to evaluate RFC 5321 section 5.1 "implicit MX" when a domain has no MX records.
+export async function lookupAddresses(name) {
+  const one = async (fn) => {
+    try { return await fn(name); } catch (err) {
+      if (NO_DATA.has(err.code)) return [];
+      throw err;
+    }
+  };
+  const [a, aaaa] = await Promise.all([one((n) => dns.resolve4(n)), one((n) => dns.resolve6(n))]);
+  return { a, aaaa };
+}
+
 export function evaluateSpf(txtRecords) {
   const spf = txtRecords.filter((r) => /^v=spf1(\s|$)/i.test(r.trim()));
   if (spf.length === 0) {
@@ -94,39 +106,105 @@ export function parseTags(record) {
   return tags;
 }
 
-export function evaluateDmarc(txtRecords) {
-  const dmarc = txtRecords.filter((r) => /^v=DMARC1\s*(;|$)/i.test(r.trim()));
+const isDmarcRecord = (r) => /^v=DMARC1\s*(;|$)/i.test(r.trim());
+
+// Names (after "_dmarc.") visited by the RFC 9989 section 4.10 DNS Tree Walk when the Author Domain itself
+// publishes no policy: the immediate parent (or, above 8 labels, the name shortened to 7 labels), then each
+// further parent up to the TLD. At most 7 names, so with the initial query never more than 8 lookups.
+export function treeWalkTargets(domain) {
+  const labels = domain.split('.');
+  const n = labels.length;
+  const start = n <= 8 ? 1 : n - 7;
+  const out = [];
+  for (let i = start; i < n; i += 1) out.push(labels.slice(i).join('.'));
+  return out;
+}
+
+// RFC 9989 section 4.10.1 policy discovery. `lookup` is injectable so the walk is testable offline.
+// Nearest valid record wins; a target with several DMARC records yields none (discarded, steps 2 and 6).
+export async function discoverDmarc(domain, lookup = lookupTxt) {
+  const queried = [`_dmarc.${domain}`];
+  const own = (await lookup(queried[0])).filter(isDmarcRecord);
+  if (own.length > 0) return { records: own, name: domain, inherited: false, queried };
+  for (const target of treeWalkTargets(domain)) {
+    const name = `_dmarc.${target}`;
+    queried.push(name);
+    const found = (await lookup(name)).filter(isDmarcRecord);
+    if (found.length === 1) return { records: found, name: target, inherited: true, queried };
+  }
+  return { records: [], name: null, inherited: false, queried };
+}
+
+export function evaluateDmarc(txtRecords, { inheritedFrom, queried } = {}) {
+  const dmarc = txtRecords.filter(isDmarcRecord);
   if (dmarc.length === 0) {
+    const scope = queried && queried.length > 0
+      ? `Queried ${queried.join(', ')}; none held a DMARC record (RFC 9989 section 4.10 DNS tree walk).`
+      : 'Only _dmarc.<domain> was queried; parent-domain policy was not checked.';
     return [finding('dmarc', 'fail', 'No DMARC record found', {
+      detail: scope,
       remediation: 'Publish a TXT record at _dmarc.<domain>, starting with "v=DMARC1; p=none; rua=mailto:..." and tighten to quarantine/reject after reviewing reports.',
     })];
   }
   if (dmarc.length > 1) {
     return [finding('dmarc', 'fail', `Multiple DMARC records (${dmarc.length})`, {
-      detail: 'Receivers ignore DMARC when more than one record is published.',
+      detail: 'Receivers discard all DMARC records when more than one is published (RFC 9989 section 4.10).',
       remediation: 'Keep exactly one record.',
     })];
   }
 
   const record = dmarc[0].trim();
   const tags = parseTags(record);
-  const out = [finding('dmarc', 'info', 'DMARC record', { detail: record })];
-  const p = (tags.p || '').toLowerCase();
+  const inherited = Boolean(inheritedFrom);
+  const out = [finding('dmarc', 'info',
+    inherited ? `DMARC record inherited from _dmarc.${inheritedFrom}` : 'DMARC record',
+    { detail: record })];
+  // A record found on a parent applies to this subdomain through "sp", falling back to "p" (RFC 9989 section 4.10.1).
+  const polTag = inherited && tags.sp !== undefined ? 'sp' : 'p';
+  const polValue = tags[polTag];
+  const p = (polValue || '').toLowerCase();
 
-  if (p === 'reject') out.push(finding('dmarc', 'pass', 'Policy p=reject'));
-  else if (p === 'quarantine') out.push(finding('dmarc', 'pass', 'Policy p=quarantine'));
+  if (p === 'reject') out.push(finding('dmarc', 'pass', `Policy ${polTag}=reject`));
+  else if (p === 'quarantine') out.push(finding('dmarc', 'pass', `Policy ${polTag}=quarantine`));
   else if (p === 'none') {
-    out.push(finding('dmarc', 'warn', 'Policy p=none — monitoring only, spoofed mail is not blocked', {
-      remediation: 'Move to p=quarantine, then p=reject, once reports show legitimate senders pass.',
+    out.push(finding('dmarc', 'warn', `Policy ${polTag}=none — monitoring only, spoofed mail is not blocked`, {
+      remediation: 'Move to quarantine, then reject, once reports show legitimate senders pass.',
     }));
   } else {
-    out.push(finding('dmarc', 'fail', `Missing or invalid policy (p=${tags.p ?? ''})`, {
+    out.push(finding('dmarc', 'fail', `Missing or invalid policy (${polTag}=${polValue ?? ''})`, {
       remediation: 'Set p=none, p=quarantine or p=reject.',
     }));
   }
 
-  if (tags.pct !== undefined && Number(tags.pct) < 100) {
-    out.push(finding('dmarc', 'warn', `Policy applied to ${tags.pct}% of mail (pct)`));
+  // "pct" was removed by RFC 9989 (Appendix A.6; registered as historic). Under section 4.7 unknown tags
+  // MUST be ignored, so RFC 9989 receivers apply the policy to all failing mail. RFC 7489 receivers may still sample.
+  if (tags.pct !== undefined) {
+    const n = Number(tags.pct);
+    const harmless = Number.isFinite(n) && n >= 100;
+    out.push(finding('dmarc', harmless ? 'info' : 'warn',
+      `Legacy "pct=${tags.pct}" tag — removed in RFC 9989 and ignored by receivers that follow it`, {
+        detail: harmless
+          ? 'pct=100 equals the default, so behaviour is unchanged.'
+          : `Receivers following RFC 9989 apply the policy to all failing mail, not ${tags.pct}%. Receivers still on RFC 7489 may sample by pct, so behaviour differs by receiver.`,
+        remediation: 'Remove pct. To keep a policy in test mode use t=y (RFC 9989 section 4.7: failing mail is handled one level below the published policy); omit t or use t=n to enforce fully.',
+      }));
+  }
+  if (tags.t !== undefined) {
+    const t = tags.t.toLowerCase();
+    if (t === 'y') {
+      if (p === 'none') {
+        out.push(finding('dmarc', 'info', 't=y has no effect with a "none" policy (RFC 9989 section 4.7)'));
+      } else {
+        out.push(finding('dmarc', 'warn', `Test mode t=y — failing mail is handled one level below ${polTag}=${p}`, {
+          detail: 'RFC 9989 section 4.7: reject is applied as quarantine and quarantine as none while t=y.',
+          remediation: 'Remove t=y (or set t=n) once reports show legitimate senders pass.',
+        }));
+      }
+    } else if (t !== 'n') {
+      out.push(finding('dmarc', 'warn', `Invalid t value "${tags.t}" (expected y or n)`, {
+        remediation: 'Use t=y while testing, or t=n / omit it to enforce.',
+      }));
+    }
   }
   if (!tags.rua) {
     out.push(finding('dmarc', 'warn', 'No aggregate reporting address (rua)', {
@@ -136,9 +214,20 @@ export function evaluateDmarc(txtRecords) {
   return out;
 }
 
-export function evaluateMx(mxRecords) {
+// RFC 5321 section 5.1: with no MX records the domain's own A/AAAA acts as an implicit MX (preference 0),
+// so an empty MX answer does not mean "no mail". Only a Null MX (RFC 7505, "0 .") declares that.
+export function evaluateMx(mxRecords, addresses = { a: [], aaaa: [] }) {
   if (mxRecords.length === 0) {
-    return [finding('mx', 'info', 'No MX records — domain does not receive mail')];
+    const addrs = [...(addresses.a || []), ...(addresses.aaaa || [])];
+    if (addrs.length > 0) {
+      return [finding('mx', 'warn', "No MX records — mail falls back to the domain's own A/AAAA address (implicit MX)", {
+        detail: `RFC 5321 section 5.1 treats the host itself as the mail exchanger (${addrs.join(', ')}).`,
+        remediation: 'If this domain should receive mail, publish explicit MX records. If it should not, publish a Null MX ("0 .", RFC 7505).',
+      })];
+    }
+    return [finding('mx', 'info', 'No MX records and no A/AAAA records — nothing to deliver mail to', {
+      detail: 'Only a Null MX ("0 .", RFC 7505) explicitly states that a domain accepts no mail.',
+    })];
   }
   if (mxRecords.length === 1 && mxRecords[0].exchange === '') {
     return [finding('mx', 'info', 'Null MX (RFC 7505) — domain explicitly accepts no mail')];
@@ -156,8 +245,14 @@ export async function checkMail(domain) {
       out.push(finding(check, 'error', `DNS lookup failed (${err.code || err.message})`));
     }
   };
-  await run('mx', async () => evaluateMx(await lookupMx(domain)));
+  await run('mx', async () => {
+    const mx = await lookupMx(domain);
+    return evaluateMx(mx, mx.length === 0 ? await lookupAddresses(domain) : undefined);
+  });
   await run('spf', async () => evaluateSpf(await lookupTxt(domain)));
-  await run('dmarc', async () => evaluateDmarc(await lookupTxt(`_dmarc.${domain}`)));
+  await run('dmarc', async () => {
+    const found = await discoverDmarc(domain);
+    return evaluateDmarc(found.records, { inheritedFrom: found.inherited ? found.name : undefined, queried: found.queried });
+  });
   return out;
 }
