@@ -27,3 +27,8 @@ export function formatText(domain, findings) {
   lines.push('', `Summary: ${c.pass} pass · ${c.warn} warn · ${c.fail} fail · ${c.info} info · ${c.error} error`);
   return lines.join('\n');
 }
+
+// One-line pointer shown at the end of the text report only (never in --json); suppressed by --no-hint.
+export function nextStepHint(domain) {
+  return `Next: continuous monitoring and change alerts for ${domain} → https://korantix.io/en?domain=${encodeURIComponent(domain)}`;
+}
