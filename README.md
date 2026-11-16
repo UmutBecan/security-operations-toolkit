@@ -9,6 +9,16 @@ Built for operations teams who want a quick, scriptable answer to
 *"is anything obviously wrong with this domain?"*, with a clear reason and a
 remediation hint for every finding.
 
+**Run it now — no install, no dependencies (Node.js 20+):**
+
+```bash
+npx github:UmutBecan/security-operations-toolkit all yourdomain.com
+```
+
+> Need this every day for many domains, with change alerts and history?
+> [**Korantix**](https://korantix.io) monitors domains from public data only:
+> no credentials, no tenant access. [Scan a domain →](https://korantix.io/en?domain=yourdomain.com)
+
 ```text
 $ node bin/secops.mjs tls expired.badssl.com
 Target: expired.badssl.com
@@ -62,12 +72,22 @@ node bin/secops.mjs tls example.com
 node bin/secops.mjs headers example.com --json
 ```
 
-Quick start: `node bin/secops.mjs all example.com --json`
+Without cloning: `npx github:UmutBecan/security-operations-toolkit all example.com --json`
 
-Example JSON output:
+Example JSON output (real run of `mail example.com --json`, DMARC findings only):
 
 ```json
-{"domain":"example.com","summary":{"pass":4,"warn":0,"fail":0},"findings":[]}
+{
+  "domain": "example.com",
+  "checkedAt": "2026-11-16T21:12:04.428Z",
+  "summary": { "pass": 2, "warn": 1, "fail": 0, "info": 4, "error": 0 },
+  "findings": [
+    { "check": "dmarc", "status": "info", "title": "DMARC record", "detail": "v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s" },
+    { "check": "dmarc", "status": "pass", "title": "Policy p=reject" },
+    { "check": "dmarc", "status": "warn", "title": "No aggregate reporting address (rua)",
+      "remediation": "Add rua=mailto:<address> to receive aggregate reports." }
+  ]
+}
 ```
 
 | Exit code | Meaning |

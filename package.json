@@ -2,6 +2,25 @@
   "name": "security-operations-toolkit",
   "version": "0.1.0",
   "description": "Small, defensive, read-only checks for domain, email and web security posture.",
+  "keywords": [
+    "dmarc",
+    "spf",
+    "email-security",
+    "tls",
+    "security-headers",
+    "domain-security",
+    "cli",
+    "devops",
+    "zero-dependency"
+  ],
+  "homepage": "https://korantix.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UmutBecan/security-operations-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/UmutBecan/security-operations-toolkit/issues"
+  },
   "type": "module",
   "bin": {
     "secops": "bin/secops.mjs"
