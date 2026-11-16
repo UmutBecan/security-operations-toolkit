@@ -3,7 +3,9 @@
 [![test](https://github.com/UmutBecan/security-operations-toolkit/actions/workflows/test.yml/badge.svg)](https://github.com/UmutBecan/security-operations-toolkit/actions/workflows/test.yml)
 
 Small, **defensive, read-only** checks for the external security posture of a
-domain: email authentication records, TLS certificates and HTTP security headers.
+domain: email authentication (SPF, DMARC, MTA-STS, TLS-RPT, and DKIM for selectors you name), TLS certificates and
+HTTP security headers. Runs one domain or a whole list and reports as text, JSON, Markdown or SARIF for GitHub
+code scanning.
 
 Built for operations teams who want a quick, scriptable answer to
 *"is anything obviously wrong with this domain?"*, with a clear reason and a
@@ -130,6 +132,117 @@ Next: continuous monitoring and change alerts for github.com → https://koranti
 Run it on a schedule in CI: [examples/github-actions/domain-check.yml](examples/github-actions/domain-check.yml)
 (weekly cron plus manual run, pinned to the release tag, fails the job on exit code `2`).
 
+## For pipelines
+
+Check a list of domains, fail or alert on the worst result, and get findings into GitHub code scanning.
+
+**1. Batch mode.** `domains.txt` (see [examples/domains.example.txt](examples/domains.example.txt)):
+
+```text
+# Domains to check, one per line. Blank lines and # comments are ignored.
+github.com
+google.com
+example.com   # IANA documentation domain
+```
+
+```bash
+node bin/secops.mjs all --file examples/domains.example.txt --no-hint
+```
+
+Each domain gets its full report, then a summary table. The exit code is the worst across all domains
+(`0` none fail, `2` at least one `fail`/`error`, `1` usage error such as an invalid line). Real output, captured
+2026-11-16 22:10 UTC with Node.js v26.13.0, trimmed to the new parts (the full text report of every domain is omitted):
+
+```text
+[MTA-STS]                                   <- google.com
+  INFO  MTA-STS TXT record
+        v=STSv1; id=20210803T010101;
+  INFO  MTA-STS policy
+        mode enforce; max_age 86400 s (1 day); mx smtp.google.com, aspmx.l.google.com, *.aspmx.l.google.com
+  PASS  MTA-STS mode=enforce
+  PASS  Every MX host is covered by the policy
+  WARN  max_age is short (86400 s (1 day))
+        RFC 8461 section 3.2: the value is typically in the range of weeks or greater, ...
+        → Use at least max_age: 604800 (one week); 31557600 (one year, the maximum) once the policy is stable.
+[TLS-RPT]
+  PASS  TLS-RPT reporting is published
+        v=TLSRPTv1;rua=mailto:sts-reports@google.com
+
+Batch summary: 3 domain(s)
+  DOMAIN       FAIL  ERROR  WARN  PASS  RESULT
+  github.com      0      0     0    10  OK
+  google.com      0      0     4     9  WARN
+  example.com     0      0     5     5  WARN
+  TOTAL           0      0     9    24  WARN
+```
+
+`--json` with `--file` returns one document: `{ "checkedAt", "summary", "domains": [ { "domain", "summary", "findings" } ] }`.
+Every finding now also carries its stable rule `id`.
+
+**2. Markdown report** for people who do not read terminals. `--format markdown` prints a summary table and, per domain,
+only what needs attention, with its remediation (same run, trimmed):
+
+```markdown
+| Domain | Status | Fail | Error | Warn | Pass |
+|---|---|---:|---:|---:|---:|
+| github.com | OK | 0 | 0 | 0 | 10 |
+| google.com | REVIEW | 0 | 0 | 4 | 9 |
+| example.com | REVIEW | 0 | 0 | 5 | 5 |
+
+### google.com
+
+| Severity | Area | Finding | Remediation |
+|---|---|---|---|
+| Warn | mta-sts | max\_age is short (86400 s (1 day)). RFC 8461 section 3.2: ... | Use at least max\_age: 604800 (one week); ... |
+| Warn | headers | Strict-Transport-Security missing | Add "Strict-Transport-Security: max-age=31536000; includeSubDomains". |
+```
+
+**3. GitHub code scanning (SARIF 2.1.0).** `--format sarif` prints a SARIF log on stdout:
+
+```bash
+node bin/secops.mjs all --file examples/domains.example.txt --format sarif > secops.sarif
+```
+
+Same three domains: 14 results from 9 rules. One rule and one result, trimmed:
+
+```json
+{ "id": "mta-sts/max-age-low",
+  "shortDescription": { "text": "MTA-STS max_age below one week (RFC 8461 sections 3.2 and 10)" },
+  "help": { "text": "Use at least max_age: 604800; 31557600 (the maximum) once the policy is stable." },
+  "defaultConfiguration": { "level": "warning" } }
+
+{ "ruleId": "mta-sts/max-age-low", "level": "warning",
+  "message": { "text": "google.com: max_age is short (86400 s (1 day)). RFC 8461 section 3.2: ... Remediation: Use at least max_age: 604800 ..." },
+  "locations": [ { "physicalLocation": {
+      "artifactLocation": { "uri": "examples/domains.example.txt" },
+      "region": { "startLine": 3, "startColumn": 1, "endLine": 3, "endColumn": 1 } },
+    "logicalLocations": [ { "name": "google.com", "kind": "resource" } ] } ],
+  "partialFingerprints": { "primaryLocationLineHash": "c991f851db06c79553ccaecfe6e2ce7f:1" } }
+```
+
+- Findings are about domains, not source files, so each result is anchored to the **line of the domain in the file
+  you passed with `--file`** (or to `domains.txt` for a single-domain run). The domain is in the message, in
+  `logicalLocations` and in the fingerprint. The fingerprint does not depend on the line, so reordering the file does
+  not reopen alerts.
+- `fail`/`error` become `error`, `warn` becomes `warning`, `info` that carries a remediation becomes `note`. `pass` and
+  plain `info` (record dumps) are not reported, so a clean domain produces no alerts.
+- A run of this command is saved as [test/fixtures/real-run.sarif.json](test/fixtures/real-run.sarif.json) and a test
+  (`validateSarifShape` in `src/sarif.mjs`) checks it for the properties GitHub's
+  [SARIF support for code scanning](https://docs.github.com/en/code-security/code-scanning/integrating-with-code-scanning/sarif-support-for-code-scanning)
+  lists as required (`$schema`, `version`, `runs`, `tool.driver.name` and `rules` with `id` and descriptions, results
+  with `message`, `locations` including a full `region`, and `partialFingerprints`). That is a structural check, not a
+  full JSON-Schema validation, and this release has **not** been uploaded to a live GitHub repository yet.
+
+Workflow: [examples/github-actions/code-scanning.yml](examples/github-actions/code-scanning.yml) runs the CLI weekly,
+treats exit code `2` (findings) as success so the upload still happens, fails on any other error, and uploads with
+`github/codeql-action/upload-sarif@v4` (needs `security-events: write`; `actions: read` for private repositories).
+Rule ids are stable (`dmarc/legacy-pct`, `mx/implicit`, `tls/expired`, `mta-sts/mx-mismatch`, ...); the full list is in
+[docs/checks.md](docs/checks.md).
+
+Safety notes for unattended use: the only URL the tool fetches that it built itself is the MTA-STS policy, and that
+fetch refuses internal names and non-public addresses, follows no redirects and is size- and time-capped
+([SECURITY.md](SECURITY.md)).
+
 ## Problem
 
 Expired certificates, missing DMARC and weak HTTP headers are among the most common
@@ -141,10 +254,15 @@ an auditor or an outage, because nobody checks them routinely.
 ```text
 bin/secops.mjs         CLI: argument parsing, output, exit codes
 src/domain.mjs         input validation (bare domain names only)
-src/checks/mail.mjs    MX, SPF, DMARC      ─┐
-src/checks/tls.mjs     certificate, TLS     ├─ lookup → evaluate → findings
-src/checks/headers.mjs HTTP headers        ─┘
-src/report.mjs         text / JSON output, exit code
+src/batch.mjs          domain-list parsing, bounded concurrency
+src/checks/mail.mjs    MX, SPF, DMARC, MTA-STS, TLS-RPT, DKIM ─┐
+src/checks/tls.mjs     certificate, TLS                         ├─ lookup → evaluate → findings
+src/checks/headers.mjs HTTP headers                            ─┘
+src/netsafe.mjs        SSRF guard for the MTA-STS policy fetch
+src/rules.mjs          stable rule ids and help text
+src/report.mjs         text output, exit code
+src/sarif.mjs          SARIF 2.1.0 (GitHub code scanning)
+src/markdown.mjs       management-readable report
 ```
 
 Every check is split into a **lookup** (network) and a pure **evaluate** function
@@ -164,8 +282,20 @@ node bin/secops.mjs mail example.com
 node bin/secops.mjs tls example.com
 node bin/secops.mjs headers example.com --json
 node bin/secops.mjs all example.com --no-hint   # omit the closing "Next:" line of the text report
+node bin/secops.mjs mail example.com --dkim-selector s1,selector2   # also check DKIM keys you know exist
+node bin/secops.mjs all --file domains.txt      # many domains, see "For pipelines"
+node bin/secops.mjs all example.com --format markdown
 node bin/secops.mjs --help
 ```
+
+| Option | Meaning |
+|---|---|
+| `--format <f>` | `text` (default), `json`, `sarif` or `markdown`. `--json` is an alias of `--format json`. |
+| `--file <path>` | Check every domain in a file: one per line, `#` comments and blank lines ignored, duplicates removed, each line validated like a single domain. `-` reads stdin. |
+| `--concurrency <n>` | Domains checked in parallel (default 4, max 16). |
+| `--skip-invalid` | With `--file`, warn about invalid lines and continue. Default: exit `1` before checking anything. |
+| `--dkim-selector s1,s2` | Also check `<selector>._domainkey.<domain>` (`mail`, `all`). Without it DKIM is reported as *not evaluated*, never as missing: selectors cannot be enumerated from DNS. |
+| `--no-hint` | Omit the one-line next-step hint of a single-domain text report. |
 
 The text report ends with one `Next:` line pointing to continuous monitoring; `--no-hint` removes it and it is
 never part of `--json` output.
@@ -204,18 +334,19 @@ What each check covers, and what it deliberately does not: [docs/checks.md](docs
 - **Deterministic rules, no scoring.** Each finding is `pass / warn / fail / info / error`
   with a title, optional detail and a remediation hint.
 - **No false certainty.** Where a check cannot know something, it says so:
-  e.g. DKIM is not checked because absence cannot be proven without a selector;
+  e.g. DKIM is only checked for selectors you name, because absence cannot be proven without one;
   CSP presence is reported, policy strength is not graded.
 - **Canary tested.** The TLS check is verified against intentionally broken
   certificates from badssl.com: [examples/tls-canaries.txt](examples/tls-canaries.txt).
 
 ```bash
-npm test     # 71 tests, no network required
+npm test     # 177 tests, no network required
 ```
 
 ## Security Considerations
 
-- **Read-only and passive:** public DNS queries, one TLS handshake, one HTTPS `GET`.
+- **Read-only and passive:** public DNS queries, one TLS handshake, one HTTPS `GET` (plus one for the MTA-STS
+  policy when the domain publishes one; SSRF-guarded, see [SECURITY.md](SECURITY.md)).
   No port scanning, no fuzzing, no credential use, no exploitation.
 - Input is restricted to bare domain names; URLs, IP addresses, ports and paths are rejected.
 - Only check domains you own or are authorized to assess.

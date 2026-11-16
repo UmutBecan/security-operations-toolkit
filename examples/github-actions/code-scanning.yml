@@ -1,0 +1,45 @@
+# Copy this file to .github/workflows/domain-code-scanning.yml in YOUR repository, and commit a domains.txt
+# (one domain per line, "#" comments allowed) next to it.
+#
+# Weekly posture check of every domain in domains.txt. Findings are uploaded as SARIF, so they appear under
+# Security > Code scanning as alerts that GitHub tracks over time (opened, fixed, reopened), instead of as a
+# red job. Alerts are anchored to the line of the domain in domains.txt; the domain is in each message.
+#
+# Only check domains you own or are authorized to assess.
+name: domain-code-scanning
+
+on:
+  schedule:
+    - cron: '23 6 * * 1'   # Mondays 06:23 UTC
+  workflow_dispatch:
+  push:
+    paths: ['domains.txt']
+
+# security-events: write is required to upload SARIF. actions: read is only needed in private repositories.
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Pinned to a release tag so a later change to the toolkit cannot alter your results unnoticed.
+      # Exit codes: 0 clean, 2 findings (they are reported through code scanning, so they must not stop the upload),
+      # anything else (1 = bad arguments or an invalid line in domains.txt) is a real error and fails the job.
+      # Add e.g. --dkim-selector s1,selector2 to also check DKIM keys you know exist.
+      - name: Check domains
+        run: |
+          code=0
+          npx --yes github:UmutBecan/security-operations-toolkit#v1.2.0 all --file domains.txt --format sarif > secops.sarif || code=$?
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then exit "$code"; fi
+      - name: Upload SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: secops.sarif
+          category: secops-domains
