@@ -29,26 +29,28 @@ export function inspectTls(host, { port = 443, timeoutMs = 10_000 } = {}) {
 export function evaluateTls(info, now = new Date()) {
   const out = [];
 
-  if (info.authorized) out.push(finding('tls', 'pass', 'Certificate chain and hostname are trusted'));
+  if (info.authorized) out.push(finding('tls', 'pass', 'Certificate chain and hostname are trusted', { id: 'tls/trusted' }));
   else {
     out.push(finding('tls', 'fail', `Certificate not trusted (${info.authorizationError || 'unknown reason'})`, {
+      id: 'tls/untrusted',
       remediation: 'Serve a certificate from a public CA that covers this hostname, with the full intermediate chain.',
     }));
   }
 
   const days = Math.floor((Date.parse(info.validTo) - now.getTime()) / DAY_MS);
   const detail = `valid to ${info.validTo}; issuer ${info.issuer ?? 'unknown'}`;
-  if (Number.isNaN(days)) out.push(finding('tls', 'error', 'Could not read certificate expiry'));
-  else if (days < 0) out.push(finding('tls', 'fail', `Certificate expired ${-days} day(s) ago`, { detail }));
-  else if (days < 14) out.push(finding('tls', 'fail', `Certificate expires in ${days} day(s)`, { detail, remediation: 'Renew now and check that automatic renewal works.' }));
-  else if (days < 30) out.push(finding('tls', 'warn', `Certificate expires in ${days} day(s)`, { detail, remediation: 'Confirm automatic renewal is scheduled.' }));
-  else out.push(finding('tls', 'pass', `Certificate valid for ${days} more day(s)`, { detail }));
+  if (Number.isNaN(days)) out.push(finding('tls', 'error', 'Could not read certificate expiry', { id: 'tls/expiry-unknown' }));
+  else if (days < 0) out.push(finding('tls', 'fail', `Certificate expired ${-days} day(s) ago`, { id: 'tls/expired', detail }));
+  else if (days < 14) out.push(finding('tls', 'fail', `Certificate expires in ${days} day(s)`, { id: 'tls/expiring-soon', detail, remediation: 'Renew now and check that automatic renewal works.' }));
+  else if (days < 30) out.push(finding('tls', 'warn', `Certificate expires in ${days} day(s)`, { id: 'tls/expiring', detail, remediation: 'Confirm automatic renewal is scheduled.' }));
+  else out.push(finding('tls', 'pass', `Certificate valid for ${days} more day(s)`, { id: 'tls/valid', detail }));
 
   // Only the negotiated version is known; this is not a full protocol enumeration.
   if (info.protocol === 'TLSv1.3' || info.protocol === 'TLSv1.2') {
-    out.push(finding('tls', 'pass', `Negotiated ${info.protocol}`));
+    out.push(finding('tls', 'pass', `Negotiated ${info.protocol}`, { id: 'tls/protocol-ok' }));
   } else {
     out.push(finding('tls', 'fail', `Negotiated legacy protocol ${info.protocol}`, {
+      id: 'tls/legacy-protocol',
       remediation: 'Disable TLS 1.0/1.1; allow TLS 1.2 and 1.3 only.',
     }));
   }
@@ -59,6 +61,6 @@ export async function checkTls(domain) {
   try {
     return evaluateTls(await inspectTls(domain));
   } catch (err) {
-    return [finding('tls', 'error', `TLS connection to ${domain}:443 failed (${err.code || err.message})`)];
+    return [finding('tls', 'error', `TLS connection to ${domain}:443 failed (${err.code || err.message})`, { id: 'tls/connect-error' })];
   }
 }

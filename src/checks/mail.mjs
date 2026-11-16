@@ -1,5 +1,10 @@
 import { promises as dns } from 'node:dns';
 import { finding } from '../finding.mjs';
+import { parseTags } from '../txt.mjs';
+import { checkMtaSts, evaluateTlsRpt, fetchPolicy as fetchMtaStsPolicy } from './mta-sts.mjs';
+import { dkimNotEvaluated, evaluateDkim } from './dkim.mjs';
+
+export { parseTags };
 
 const NO_DATA = new Set(['ENODATA', 'ENOTFOUND']);
 const SPF_LOOKUP_LIMIT = 10;
@@ -39,11 +44,13 @@ export function evaluateSpf(txtRecords) {
   const spf = txtRecords.filter((r) => /^v=spf1(\s|$)/i.test(r.trim()));
   if (spf.length === 0) {
     return [finding('spf', 'fail', 'No SPF record found', {
+      id: 'spf/missing',
       remediation: 'Publish one TXT record starting with "v=spf1" that lists your sending services and ends with "-all" or "~all".',
     })];
   }
   if (spf.length > 1) {
     return [finding('spf', 'fail', `Multiple SPF records (${spf.length})`, {
+      id: 'spf/multiple',
       detail: 'RFC 7208 treats more than one SPF record as a permanent error.',
       remediation: 'Merge them into a single v=spf1 record.',
     })];
@@ -51,30 +58,33 @@ export function evaluateSpf(txtRecords) {
 
   const record = spf[0].trim();
   const terms = record.split(/\s+/).slice(1);
-  const out = [finding('spf', 'info', 'SPF record', { detail: record })];
+  const out = [finding('spf', 'info', 'SPF record', { id: 'spf/record', detail: record })];
 
   const all = terms.find((t) => /^[+\-~?]?all$/i.test(t));
   const hasRedirect = terms.some((t) => /^redirect=/i.test(t));
   if (!all) {
     out.push(hasRedirect
-      ? finding('spf', 'info', 'Policy delegated with redirect=')
+      ? finding('spf', 'info', 'Policy delegated with redirect=', { id: 'spf/delegated' })
       : finding('spf', 'warn', 'No "all" mechanism — unlisted senders are not rejected', {
+        id: 'spf/no-all',
         remediation: 'End the record with "-all" (or "~all" while rolling out).',
       }));
   } else {
     const q = /^[+\-~?]/.test(all) ? all[0] : '+';
     if (q === '+') {
       out.push(finding('spf', 'fail', `"${all}" allows any server to send as this domain`, {
+        id: 'spf/plus-all',
         remediation: 'Replace with "-all" or "~all".',
       }));
     } else if (q === '?') {
       out.push(finding('spf', 'warn', '"?all" (neutral) gives receivers no guidance', {
+        id: 'spf/neutral-all',
         remediation: 'Use "-all" or "~all".',
       }));
     } else if (q === '~') {
-      out.push(finding('spf', 'pass', '"~all" softfail policy'));
+      out.push(finding('spf', 'pass', '"~all" softfail policy', { id: 'spf/softfail' }));
     } else {
-      out.push(finding('spf', 'pass', '"-all" hardfail policy'));
+      out.push(finding('spf', 'pass', '"-all" hardfail policy', { id: 'spf/hardfail' }));
     }
   }
 
@@ -83,27 +93,20 @@ export function evaluateSpf(txtRecords) {
     || /^redirect=/i.test(t)).length;
   if (lookups > SPF_LOOKUP_LIMIT) {
     out.push(finding('spf', 'fail', `${lookups} DNS-querying terms at top level (limit ${SPF_LOOKUP_LIMIT})`, {
+      id: 'spf/lookup-limit',
       remediation: 'Remove unused includes or flatten the record.',
     }));
   } else {
-    out.push(finding('spf', 'info', `${lookups} DNS-querying terms at top level (limit ${SPF_LOOKUP_LIMIT}; nested includes not counted)`));
+    out.push(finding('spf', 'info', `${lookups} DNS-querying terms at top level (limit ${SPF_LOOKUP_LIMIT}; nested includes not counted)`, { id: 'spf/lookup-count' }));
   }
 
   if (terms.some((t) => /^[+\-~?]?ptr(:|$)/i.test(t))) {
     out.push(finding('spf', 'warn', '"ptr" mechanism is deprecated (RFC 7208 §5.5)', {
+      id: 'spf/ptr',
       remediation: 'Replace "ptr" with explicit ip4/ip6 or include terms.',
     }));
   }
   return out;
-}
-
-export function parseTags(record) {
-  const tags = {};
-  for (const part of record.split(';')) {
-    const i = part.indexOf('=');
-    if (i > 0) tags[part.slice(0, i).trim().toLowerCase()] = part.slice(i + 1).trim();
-  }
-  return tags;
 }
 
 const isDmarcRecord = (r) => /^v=DMARC1\s*(;|$)/i.test(r.trim());
@@ -142,12 +145,14 @@ export function evaluateDmarc(txtRecords, { inheritedFrom, queried } = {}) {
       ? `Queried ${queried.join(', ')}; none held a DMARC record (RFC 9989 section 4.10 DNS tree walk).`
       : 'Only _dmarc.<domain> was queried; parent-domain policy was not checked.';
     return [finding('dmarc', 'fail', 'No DMARC record found', {
+      id: 'dmarc/missing',
       detail: scope,
       remediation: 'Publish a TXT record at _dmarc.<domain>, starting with "v=DMARC1; p=none; rua=mailto:..." and tighten to quarantine/reject after reviewing reports.',
     })];
   }
   if (dmarc.length > 1) {
     return [finding('dmarc', 'fail', `Multiple DMARC records (${dmarc.length})`, {
+      id: 'dmarc/multiple',
       detail: 'Receivers discard all DMARC records when more than one is published (RFC 9989 section 4.10).',
       remediation: 'Keep exactly one record.',
     })];
@@ -158,20 +163,22 @@ export function evaluateDmarc(txtRecords, { inheritedFrom, queried } = {}) {
   const inherited = Boolean(inheritedFrom);
   const out = [finding('dmarc', 'info',
     inherited ? `DMARC record inherited from _dmarc.${inheritedFrom}` : 'DMARC record',
-    { detail: record })];
+    { id: 'dmarc/record', detail: record })];
   // A record found on a parent applies to this subdomain through "sp", falling back to "p" (RFC 9989 section 4.10.1).
   const polTag = inherited && tags.sp !== undefined ? 'sp' : 'p';
   const polValue = tags[polTag];
   const p = (polValue || '').toLowerCase();
 
-  if (p === 'reject') out.push(finding('dmarc', 'pass', `Policy ${polTag}=reject`));
-  else if (p === 'quarantine') out.push(finding('dmarc', 'pass', `Policy ${polTag}=quarantine`));
+  if (p === 'reject') out.push(finding('dmarc', 'pass', `Policy ${polTag}=reject`, { id: 'dmarc/policy-reject' }));
+  else if (p === 'quarantine') out.push(finding('dmarc', 'pass', `Policy ${polTag}=quarantine`, { id: 'dmarc/policy-quarantine' }));
   else if (p === 'none') {
     out.push(finding('dmarc', 'warn', `Policy ${polTag}=none — monitoring only, spoofed mail is not blocked`, {
+      id: 'dmarc/policy-none',
       remediation: 'Move to quarantine, then reject, once reports show legitimate senders pass.',
     }));
   } else {
     out.push(finding('dmarc', 'fail', `Missing or invalid policy (${polTag}=${polValue ?? ''})`, {
+      id: 'dmarc/policy-invalid',
       remediation: 'Set p=none, p=quarantine or p=reject.',
     }));
   }
@@ -183,6 +190,7 @@ export function evaluateDmarc(txtRecords, { inheritedFrom, queried } = {}) {
     const harmless = Number.isFinite(n) && n >= 100;
     out.push(finding('dmarc', harmless ? 'info' : 'warn',
       `Legacy "pct=${tags.pct}" tag — removed in RFC 9989 and ignored by receivers that follow it`, {
+        id: 'dmarc/legacy-pct',
         detail: harmless
           ? 'pct=100 equals the default, so behaviour is unchanged.'
           : `Receivers following RFC 9989 apply the policy to all failing mail, not ${tags.pct}%. Receivers still on RFC 7489 may sample by pct, so behaviour differs by receiver.`,
@@ -193,21 +201,24 @@ export function evaluateDmarc(txtRecords, { inheritedFrom, queried } = {}) {
     const t = tags.t.toLowerCase();
     if (t === 'y') {
       if (p === 'none') {
-        out.push(finding('dmarc', 'info', 't=y has no effect with a "none" policy (RFC 9989 section 4.7)'));
+        out.push(finding('dmarc', 'info', 't=y has no effect with a "none" policy (RFC 9989 section 4.7)', { id: 'dmarc/test-mode-noop' }));
       } else {
         out.push(finding('dmarc', 'warn', `Test mode t=y — failing mail is handled one level below ${polTag}=${p}`, {
+          id: 'dmarc/test-mode',
           detail: 'RFC 9989 section 4.7: reject is applied as quarantine and quarantine as none while t=y.',
           remediation: 'Remove t=y (or set t=n) once reports show legitimate senders pass.',
         }));
       }
     } else if (t !== 'n') {
       out.push(finding('dmarc', 'warn', `Invalid t value "${tags.t}" (expected y or n)`, {
+        id: 'dmarc/invalid-t',
         remediation: 'Use t=y while testing, or t=n / omit it to enforce.',
       }));
     }
   }
   if (!tags.rua) {
     out.push(finding('dmarc', 'warn', 'No aggregate reporting address (rua)', {
+      id: 'dmarc/no-rua',
       remediation: 'Add rua=mailto:<address> to receive aggregate reports.',
     }));
   }
@@ -221,38 +232,53 @@ export function evaluateMx(mxRecords, addresses = { a: [], aaaa: [] }) {
     const addrs = [...(addresses.a || []), ...(addresses.aaaa || [])];
     if (addrs.length > 0) {
       return [finding('mx', 'warn', "No MX records — mail falls back to the domain's own A/AAAA address (implicit MX)", {
+        id: 'mx/implicit',
         detail: `RFC 5321 section 5.1 treats the host itself as the mail exchanger (${addrs.join(', ')}).`,
         remediation: 'If this domain should receive mail, publish explicit MX records. If it should not, publish a Null MX ("0 .", RFC 7505).',
       })];
     }
     return [finding('mx', 'info', 'No MX records and no A/AAAA records — nothing to deliver mail to', {
+      id: 'mx/none',
       detail: 'Only a Null MX ("0 .", RFC 7505) explicitly states that a domain accepts no mail.',
     })];
   }
   if (mxRecords.length === 1 && mxRecords[0].exchange === '') {
-    return [finding('mx', 'info', 'Null MX (RFC 7505) — domain explicitly accepts no mail')];
+    return [finding('mx', 'info', 'Null MX (RFC 7505) — domain explicitly accepts no mail', { id: 'mx/null' })];
   }
   const hosts = [...mxRecords].sort((a, b) => a.priority - b.priority)
     .map((r) => `${r.priority} ${r.exchange}`).join(', ');
-  return [finding('mx', 'info', `${mxRecords.length} MX record(s)`, { detail: hosts })];
+  return [finding('mx', 'info', `${mxRecords.length} MX record(s)`, { id: 'mx/list', detail: hosts })];
 }
 
-// DKIM is intentionally not checked: without a known selector its absence cannot be proven.
-export async function checkMail(domain) {
-  const out = [];
-  const run = async (check, fn) => {
-    try { out.push(...(await fn())); } catch (err) {
-      out.push(finding(check, 'error', `DNS lookup failed (${err.code || err.message})`));
+// Without --dkim-selector DKIM is reported as "not evaluated", never as missing: a selector cannot be
+// discovered from DNS, so absence cannot be proven. `deps` makes every network call injectable for offline tests.
+export async function checkMail(domain, { dkimSelectors = [], deps = {} } = {}) {
+  const d = {
+    lookupTxt, lookupMx, lookupAddresses, fetchPolicy: fetchMtaStsPolicy, ...deps,
+  };
+  let mxHosts = [];
+  const section = async (check, fn) => {
+    try { return await fn(); } catch (err) {
+      return [finding(check, 'error', `DNS lookup failed (${err.code || err.message})`, { id: `${check}/lookup-error` })];
     }
   };
-  await run('mx', async () => {
-    const mx = await lookupMx(domain);
-    return evaluateMx(mx, mx.length === 0 ? await lookupAddresses(domain) : undefined);
+  const mx = await section('mx', async () => {
+    const records = await d.lookupMx(domain);
+    mxHosts = records.map((r) => r.exchange).filter(Boolean);
+    return evaluateMx(records, records.length === 0 ? await d.lookupAddresses(domain) : undefined);
   });
-  await run('spf', async () => evaluateSpf(await lookupTxt(domain)));
-  await run('dmarc', async () => {
-    const found = await discoverDmarc(domain);
-    return evaluateDmarc(found.records, { inheritedFrom: found.inherited ? found.name : undefined, queried: found.queried });
-  });
-  return out;
+  const parts = await Promise.all([
+    section('spf', async () => evaluateSpf(await d.lookupTxt(domain))),
+    section('dmarc', async () => {
+      const found = await discoverDmarc(domain, d.lookupTxt);
+      return evaluateDmarc(found.records, { inheritedFrom: found.inherited ? found.name : undefined, queried: found.queried });
+    }),
+    section('mta-sts', () => checkMtaSts(domain, { lookupTxt: d.lookupTxt, fetchPolicy: d.fetchPolicy, mxHosts })),
+    section('tls-rpt', async () => evaluateTlsRpt(await d.lookupTxt(`_smtp._tls.${domain}`))),
+    dkimSelectors.length === 0
+      ? [dkimNotEvaluated()]
+      : Promise.all(dkimSelectors.map((sel) => section('dkim', async () => evaluateDkim(sel, domain, await d.lookupTxt(`${sel}._domainkey.${domain}`)))))
+        .then((r) => r.flat()),
+  ]);
+  return [...mx, ...parts.flat()];
 }
