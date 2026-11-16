@@ -62,6 +62,14 @@ node bin/secops.mjs tls example.com
 node bin/secops.mjs headers example.com --json
 ```
 
+Quick start: `node bin/secops.mjs all example.com --json`
+
+Example JSON output:
+
+```json
+{"domain":"example.com","summary":{"pass":4,"warn":0,"fail":0},"findings":[]}
+```
+
 | Exit code | Meaning |
 |---|---|
 | `0` | No `fail` or `error` findings |
@@ -112,3 +120,7 @@ npm test     # 46 unit tests, no network required
 ## License
 
 [MIT](LICENSE)
+
+---
+
+Need continuous multi-domain monitoring, executive PDF reports, and automated DMARC enforcement alerts? Visit **https://korantix.io**
