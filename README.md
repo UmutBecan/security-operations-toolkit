@@ -37,6 +37,99 @@ Full sample output: [examples/example.com.txt](examples/example.com.txt)
 
 ---
 
+## Verified run
+
+Pin a release tag so results do not change under you:
+
+```bash
+npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all example.com
+```
+
+Output below was captured on 2026-11-17 with Node.js v26.13.0 by running `node bin/secops.mjs all <domain>`
+from the v0.2.0 source tree (exit code `0` for both). Certificate day counts and live DNS/HTTP data change over time.
+The `#v0.2.0` form works once that tag is published to GitHub.
+
+`example.com`:
+
+```text
+Target: example.com
+
+[MX]
+  INFO  Null MX (RFC 7505) — domain explicitly accepts no mail
+[SPF]
+  INFO  SPF record
+        v=spf1 -all
+  PASS  "-all" hardfail policy
+  INFO  0 DNS-querying terms at top level (limit 10; nested includes not counted)
+[DMARC]
+  INFO  DMARC record
+        v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s
+  PASS  Policy p=reject
+  WARN  No aggregate reporting address (rua)
+        → Add rua=mailto:<address> to receive aggregate reports.
+[TLS]
+  PASS  Certificate chain and hostname are trusted
+  PASS  Certificate valid for 39 more day(s)
+        valid to Dec 25 22:56:35 2026 GMT; issuer SSL Corporation
+  PASS  Negotiated TLSv1.3
+[HEADERS]
+  INFO  Final response 200 from https://example.com/
+  WARN  Strict-Transport-Security missing
+        → Add "Strict-Transport-Security: max-age=31536000; includeSubDomains".
+  WARN  Content-Security-Policy missing
+        → Define a CSP; start in Content-Security-Policy-Report-Only mode.
+  WARN  X-Content-Type-Options: nosniff missing
+  WARN  No clickjacking protection
+        → Add CSP "frame-ancestors 'self'" or "X-Frame-Options: DENY".
+  INFO  Referrer-Policy not set (browser default applies)
+
+Summary: 5 pass · 5 warn · 0 fail · 6 info · 0 error
+
+Next: continuous monitoring and change alerts for example.com → https://korantix.io/en?domain=example.com
+```
+
+`github.com`:
+
+```text
+Target: github.com
+
+[MX]
+  INFO  1 MX record(s)
+        0 github-com.mail.protection.outlook.com
+[SPF]
+  INFO  SPF record
+        v=spf1 ip4:192.30.252.0/22 include:spf.protection.outlook.com include:_netblocks.google.com include:_netblocks2.google.com include:mail.zendesk.com include:_spf.salesforce.com include:servers.mcsv.net include:mktomail.com include:sendgrid.net ip4:62.253.227.114 ip4:166.78.69.169 ip4:166.78.69.170 ip4:166.78.71.131 ~all
+  PASS  "~all" softfail policy
+  INFO  8 DNS-querying terms at top level (limit 10; nested includes not counted)
+[DMARC]
+  INFO  DMARC record
+        v=DMARC1; p=quarantine; sp=reject; pct=100; rua=mailto:dmarc@github.com; ruf=mailto:dmarc@github.com; fo=1
+  PASS  Policy p=quarantine
+  INFO  Legacy "pct=100" tag — removed in RFC 9989 and ignored by receivers that follow it
+        pct=100 equals the default, so behaviour is unchanged.
+        → Remove pct. To keep a policy in test mode use t=y (RFC 9989 section 4.7: failing mail is handled one level below the published policy); omit t or use t=n to enforce fully.
+[TLS]
+  PASS  Certificate chain and hostname are trusted
+  PASS  Certificate valid for 72 more day(s)
+        valid to Jan 27 23:59:59 2027 GMT; issuer Sectigo Limited
+  PASS  Negotiated TLSv1.3
+[HEADERS]
+  INFO  Final response 200 from https://github.com/
+  PASS  Strict-Transport-Security present
+        max-age=31536000; includeSubdomains; preload
+  PASS  Content-Security-Policy present (policy strength not evaluated)
+  PASS  X-Content-Type-Options: nosniff
+  PASS  Clickjacking protection (frame-ancestors or X-Frame-Options)
+  PASS  Referrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin
+
+Summary: 10 pass · 0 warn · 0 fail · 6 info · 0 error
+
+Next: continuous monitoring and change alerts for github.com → https://korantix.io/en?domain=github.com
+```
+
+Run it on a schedule in CI: [examples/github-actions/domain-check.yml](examples/github-actions/domain-check.yml)
+(weekly cron plus manual run, pinned to the release tag, fails the job on exit code `2`).
+
 ## Problem
 
 Expired certificates, missing DMARC and weak HTTP headers are among the most common
@@ -70,7 +163,12 @@ node bin/secops.mjs all example.com
 node bin/secops.mjs mail example.com
 node bin/secops.mjs tls example.com
 node bin/secops.mjs headers example.com --json
+node bin/secops.mjs all example.com --no-hint   # omit the closing "Next:" line of the text report
+node bin/secops.mjs --help
 ```
+
+The text report ends with one `Next:` line pointing to continuous monitoring; `--no-hint` removes it and it is
+never part of `--json` output.
 
 Without cloning: `npx github:UmutBecan/security-operations-toolkit all example.com --json`
 
@@ -112,7 +210,7 @@ What each check covers, and what it deliberately does not: [docs/checks.md](docs
   certificates from badssl.com: [examples/tls-canaries.txt](examples/tls-canaries.txt).
 
 ```bash
-npm test     # 46 unit tests, no network required
+npm test     # 71 tests, no network required
 ```
 
 ## Security Considerations

@@ -1,0 +1,37 @@
+# Copy this file to .github/workflows/domain-check.yml in YOUR repository.
+# Weekly posture check of a domain you own; the job fails when the toolkit exits with code 2
+# (at least one "fail" or "error" finding). Warnings alone do not fail the job.
+#
+# Only check domains you own or are authorized to assess.
+name: domain-check
+
+on:
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      DOMAIN: example.com   # <- change to your domain
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Pinned to a release tag so a later change to the toolkit cannot alter your results unnoticed.
+      # npx exits with the toolkit's exit code: 0 ok, 1 usage error, 2 findings -> the job fails on 1 and 2.
+      - name: Run checks
+        run: npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all "$DOMAIN" --no-hint
+      # Optional: keep a machine-readable copy even when the step above failed.
+      - name: Save JSON report
+        if: always()
+        run: npx --yes github:UmutBecan/security-operations-toolkit#v0.2.0 all "$DOMAIN" --json > report.json || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: domain-check-report
+          path: report.json

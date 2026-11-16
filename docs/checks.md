@@ -4,7 +4,10 @@
 
 | Rule | Status |
 |---|---|
-| No MX / null MX (RFC 7505) / MX list | info |
+| MX list | info |
+| Null MX (RFC 7505, `0 .`): explicitly accepts no mail | info |
+| No MX but A/AAAA present: implicit MX (RFC 5321 §5.1) | warn |
+| No MX and no A/AAAA | info |
 | No SPF record | fail |
 | More than one SPF record (RFC 7208 permerror) | fail |
 | `+all` or bare `all` | fail |
@@ -13,17 +16,25 @@
 | `~all` / `-all` | pass |
 | More than 10 DNS-querying terms at top level | fail |
 | `ptr` mechanism (deprecated) | warn |
-| No DMARC record at `_dmarc.<domain>` | fail |
+| No DMARC record at `_dmarc.<domain>` or, via the RFC 9989 §4.10 tree walk, at a parent | fail |
+| Record inherited from a parent (judged by `sp`, else `p`) | info |
 | More than one DMARC record | fail |
 | `p=reject` / `p=quarantine` | pass |
 | `p=none` | warn |
 | Missing or invalid `p=` | fail |
-| `pct` below 100 | warn |
+| Legacy `pct` below 100 (removed in RFC 9989, ignored by its receivers) | warn |
+| Legacy `pct=100` | info |
+| `t=y` with `quarantine`/`reject` (RFC 9989 test mode) | warn |
+| `t=y` with `p=none`, or an invalid `t` value | info / warn |
 | No `rua` | warn |
 
 **Not checked:** DKIM. A DKIM record lives at `<selector>._domainkey.<domain>` and the
 selector is not discoverable from DNS, so a missing record cannot be proven. Reporting
 "DKIM missing" without a known selector would be a false finding.
+
+**DMARC discovery:** `_dmarc.<domain>` first, then the parent names of the RFC 9989 section 4.10 DNS tree walk
+(at most 8 lookups; names with more than 8 labels are shortened to 7). The nearest valid record wins; a name with
+several DMARC records contributes none. The `np` tag (non-existent subdomains) is not evaluated.
 
 **Limitation:** SPF lookup counting does not follow nested `include:` chains.
 
