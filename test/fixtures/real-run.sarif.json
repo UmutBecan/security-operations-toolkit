@@ -1,0 +1,776 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "security-operations-toolkit",
+          "version": "1.2.0",
+          "semanticVersion": "1.2.0",
+          "informationUri": "https://github.com/UmutBecan/security-operations-toolkit",
+          "rules": [
+            {
+              "id": "dmarc/legacy-pct",
+              "shortDescription": {
+                "text": "DMARC \"pct\" tag is legacy (removed in RFC 9989)"
+              },
+              "fullDescription": {
+                "text": "DMARC \"pct\" tag is legacy (removed in RFC 9989). Remove pct. Use t=y for test mode (RFC 9989 section 4.7); omit t or use t=n to enforce fully."
+              },
+              "help": {
+                "text": "Remove pct. Use t=y for test mode (RFC 9989 section 4.7); omit t or use t=n to enforce fully.",
+                "markdown": "Remove pct. Use t=y for test mode (RFC 9989 section 4.7); omit t or use t=n to enforce fully."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "dmarc"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "mta-sts/missing",
+              "shortDescription": {
+                "text": "MTA-STS not published (RFC 8461)"
+              },
+              "fullDescription": {
+                "text": "MTA-STS not published (RFC 8461). Optional hardening: publish an MTA-STS policy, starting with mode=testing and a TLS-RPT record."
+              },
+              "help": {
+                "text": "Optional hardening: publish an MTA-STS policy, starting with mode=testing and a TLS-RPT record.",
+                "markdown": "Optional hardening: publish an MTA-STS policy, starting with mode=testing and a TLS-RPT record."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "mta-sts"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "tls-rpt/missing",
+              "shortDescription": {
+                "text": "TLS-RPT not published (RFC 8460)"
+              },
+              "fullDescription": {
+                "text": "TLS-RPT not published (RFC 8460). Optional: publish \"v=TLSRPTv1; rua=mailto:<address>\" at _smtp._tls.<domain> to receive TLS failure reports."
+              },
+              "help": {
+                "text": "Optional: publish \"v=TLSRPTv1; rua=mailto:<address>\" at _smtp._tls.<domain> to receive TLS failure reports.",
+                "markdown": "Optional: publish \"v=TLSRPTv1; rua=mailto:<address>\" at _smtp._tls.<domain> to receive TLS failure reports."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "note"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "tls-rpt"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "mta-sts/max-age-low",
+              "shortDescription": {
+                "text": "MTA-STS max_age below one week (RFC 8461 sections 3.2 and 10)"
+              },
+              "fullDescription": {
+                "text": "MTA-STS max_age below one week (RFC 8461 sections 3.2 and 10). Use at least max_age: 604800; 31557600 (the maximum) once the policy is stable."
+              },
+              "help": {
+                "text": "Use at least max_age: 604800; 31557600 (the maximum) once the policy is stable.",
+                "markdown": "Use at least max_age: 604800; 31557600 (the maximum) once the policy is stable."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "mta-sts"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "headers/hsts-missing",
+              "shortDescription": {
+                "text": "Strict-Transport-Security header missing"
+              },
+              "fullDescription": {
+                "text": "Strict-Transport-Security header missing. Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\"."
+              },
+              "help": {
+                "text": "Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\".",
+                "markdown": "Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\"."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "headers"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "headers/csp-missing",
+              "shortDescription": {
+                "text": "Content-Security-Policy header missing"
+              },
+              "fullDescription": {
+                "text": "Content-Security-Policy header missing. Define a CSP; start in Content-Security-Policy-Report-Only mode."
+              },
+              "help": {
+                "text": "Define a CSP; start in Content-Security-Policy-Report-Only mode.",
+                "markdown": "Define a CSP; start in Content-Security-Policy-Report-Only mode."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "headers"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "headers/nosniff-missing",
+              "shortDescription": {
+                "text": "X-Content-Type-Options: nosniff missing"
+              },
+              "fullDescription": {
+                "text": "X-Content-Type-Options: nosniff missing. Add \"X-Content-Type-Options: nosniff\"."
+              },
+              "help": {
+                "text": "Add \"X-Content-Type-Options: nosniff\".",
+                "markdown": "Add \"X-Content-Type-Options: nosniff\"."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "headers"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "dmarc/no-rua",
+              "shortDescription": {
+                "text": "DMARC has no aggregate reporting address"
+              },
+              "fullDescription": {
+                "text": "DMARC has no aggregate reporting address. Add rua=mailto:<address> to receive aggregate reports."
+              },
+              "help": {
+                "text": "Add rua=mailto:<address> to receive aggregate reports.",
+                "markdown": "Add rua=mailto:<address> to receive aggregate reports."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "dmarc"
+                ],
+                "precision": "high"
+              }
+            },
+            {
+              "id": "headers/framing-missing",
+              "shortDescription": {
+                "text": "No clickjacking protection"
+              },
+              "fullDescription": {
+                "text": "No clickjacking protection. Add CSP \"frame-ancestors 'self'\" or \"X-Frame-Options: DENY\"."
+              },
+              "help": {
+                "text": "Add CSP \"frame-ancestors 'self'\" or \"X-Frame-Options: DENY\".",
+                "markdown": "Add CSP \"frame-ancestors 'self'\" or \"X-Frame-Options: DENY\"."
+              },
+              "helpUri": "https://github.com/UmutBecan/security-operations-toolkit/blob/main/docs/checks.md",
+              "defaultConfiguration": {
+                "level": "warning"
+              },
+              "properties": {
+                "tags": [
+                  "external-posture",
+                  "headers"
+                ],
+                "precision": "high"
+              }
+            }
+          ]
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "dmarc/legacy-pct",
+          "level": "note",
+          "message": {
+            "text": "github.com: Legacy \"pct=100\" tag — removed in RFC 9989 and ignored by receivers that follow it. pct=100 equals the default, so behaviour is unchanged. Remediation: Remove pct. To keep a policy in test mode use t=y (RFC 9989 section 4.7: failing mail is handled one level below the published policy); omit t or use t=n to enforce fully."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 2,
+                  "startColumn": 1,
+                  "endLine": 2,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "github.com",
+                  "fullyQualifiedName": "github.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "ce208ce6655986c7efb3e4ac8c9ee7f2:1"
+          },
+          "properties": {
+            "domain": "github.com",
+            "check": "dmarc",
+            "status": "info"
+          },
+          "ruleIndex": 0
+        },
+        {
+          "ruleId": "mta-sts/missing",
+          "level": "note",
+          "message": {
+            "text": "github.com: MTA-STS not published. No \"v=STSv1\" TXT record at _mta-sts.<domain> (RFC 8461 section 3.1). Remediation: Optional hardening: publish an MTA-STS policy (start with mode=testing and a TLS-RPT record) so sending servers require TLS to your MX hosts."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 2,
+                  "startColumn": 1,
+                  "endLine": 2,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "github.com",
+                  "fullyQualifiedName": "github.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "8d1baef0c34dbeb870dc8a7d3128faa5:1"
+          },
+          "properties": {
+            "domain": "github.com",
+            "check": "mta-sts",
+            "status": "info"
+          },
+          "ruleIndex": 1
+        },
+        {
+          "ruleId": "tls-rpt/missing",
+          "level": "note",
+          "message": {
+            "text": "github.com: TLS-RPT not published. No \"v=TLSRPTv1\" TXT record at _smtp._tls.<domain> (RFC 8460 section 3). Remediation: Optional: publish \"v=TLSRPTv1; rua=mailto:<address>\" to receive daily reports about TLS failures when other servers deliver to you."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 2,
+                  "startColumn": 1,
+                  "endLine": 2,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "github.com",
+                  "fullyQualifiedName": "github.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "c992b67dc897f57f82402c830da33cc2:1"
+          },
+          "properties": {
+            "domain": "github.com",
+            "check": "tls-rpt",
+            "status": "info"
+          },
+          "ruleIndex": 2
+        },
+        {
+          "ruleId": "mta-sts/max-age-low",
+          "level": "warning",
+          "message": {
+            "text": "google.com: max_age is short (86400 s (1 day)). RFC 8461 section 3.2: the value is typically in the range of weeks or greater, to limit attacks at policy refresh time; section 10: prefer values as long as is practical. Remediation: Use at least max_age: 604800 (one week); 31557600 (one year, the maximum) once the policy is stable."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 1,
+                  "endLine": 3,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "google.com",
+                  "fullyQualifiedName": "google.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "c991f851db06c79553ccaecfe6e2ce7f:1"
+          },
+          "properties": {
+            "domain": "google.com",
+            "check": "mta-sts",
+            "status": "warn"
+          },
+          "ruleIndex": 3
+        },
+        {
+          "ruleId": "headers/hsts-missing",
+          "level": "warning",
+          "message": {
+            "text": "google.com: Strict-Transport-Security missing. Remediation: Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 1,
+                  "endLine": 3,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "google.com",
+                  "fullyQualifiedName": "google.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "249983b005cb625fc1be827ab56e6f88:1"
+          },
+          "properties": {
+            "domain": "google.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 4
+        },
+        {
+          "ruleId": "headers/csp-missing",
+          "level": "warning",
+          "message": {
+            "text": "google.com: Content-Security-Policy missing. Remediation: Define a CSP; start in Content-Security-Policy-Report-Only mode."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 1,
+                  "endLine": 3,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "google.com",
+                  "fullyQualifiedName": "google.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "c5ecb4c55e6b4e2f66012b1254e51af0:1"
+          },
+          "properties": {
+            "domain": "google.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 5
+        },
+        {
+          "ruleId": "headers/nosniff-missing",
+          "level": "warning",
+          "message": {
+            "text": "google.com: X-Content-Type-Options: nosniff missing."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 3,
+                  "startColumn": 1,
+                  "endLine": 3,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "google.com",
+                  "fullyQualifiedName": "google.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "4ba912c7b601eb54905d8a4b704c6812:1"
+          },
+          "properties": {
+            "domain": "google.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 6
+        },
+        {
+          "ruleId": "dmarc/no-rua",
+          "level": "warning",
+          "message": {
+            "text": "example.com: No aggregate reporting address (rua). Remediation: Add rua=mailto:<address> to receive aggregate reports."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "7ef3c0184bcae553e35e8cdebeeec932:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "dmarc",
+            "status": "warn"
+          },
+          "ruleIndex": 7
+        },
+        {
+          "ruleId": "mta-sts/missing",
+          "level": "note",
+          "message": {
+            "text": "example.com: MTA-STS not published. No \"v=STSv1\" TXT record at _mta-sts.<domain> (RFC 8461 section 3.1). Remediation: Optional hardening: publish an MTA-STS policy (start with mode=testing and a TLS-RPT record) so sending servers require TLS to your MX hosts."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "ed1bb60505fab29a1355aa98f6d9634b:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "mta-sts",
+            "status": "info"
+          },
+          "ruleIndex": 1
+        },
+        {
+          "ruleId": "tls-rpt/missing",
+          "level": "note",
+          "message": {
+            "text": "example.com: TLS-RPT not published. No \"v=TLSRPTv1\" TXT record at _smtp._tls.<domain> (RFC 8460 section 3). Remediation: Optional: publish \"v=TLSRPTv1; rua=mailto:<address>\" to receive daily reports about TLS failures when other servers deliver to you."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "d1a71b95e6df92260e87d8283cd50368:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "tls-rpt",
+            "status": "info"
+          },
+          "ruleIndex": 2
+        },
+        {
+          "ruleId": "headers/hsts-missing",
+          "level": "warning",
+          "message": {
+            "text": "example.com: Strict-Transport-Security missing. Remediation: Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "de0c9b097afd113f47d1465e9f8e75ed:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 4
+        },
+        {
+          "ruleId": "headers/csp-missing",
+          "level": "warning",
+          "message": {
+            "text": "example.com: Content-Security-Policy missing. Remediation: Define a CSP; start in Content-Security-Policy-Report-Only mode."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "dddc4fbfc9df974fd02c7fd2619bb8bf:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 5
+        },
+        {
+          "ruleId": "headers/nosniff-missing",
+          "level": "warning",
+          "message": {
+            "text": "example.com: X-Content-Type-Options: nosniff missing."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "2c585a495ffc32c5cb79b4c4b97bda4b:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 6
+        },
+        {
+          "ruleId": "headers/framing-missing",
+          "level": "warning",
+          "message": {
+            "text": "example.com: No clickjacking protection. Remediation: Add CSP \"frame-ancestors 'self'\" or \"X-Frame-Options: DENY\"."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "examples/domains.example.txt"
+                },
+                "region": {
+                  "startLine": 4,
+                  "startColumn": 1,
+                  "endLine": 4,
+                  "endColumn": 1
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "example.com",
+                  "fullyQualifiedName": "example.com",
+                  "kind": "resource"
+                }
+              ]
+            }
+          ],
+          "partialFingerprints": {
+            "primaryLocationLineHash": "8e429010b120102aee0749521a638781:1"
+          },
+          "properties": {
+            "domain": "example.com",
+            "check": "headers",
+            "status": "warn"
+          },
+          "ruleIndex": 8
+        }
+      ],
+      "properties": {
+        "domainsChecked": 3
+      }
+    }
+  ]
+}

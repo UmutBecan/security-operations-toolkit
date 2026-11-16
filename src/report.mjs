@@ -32,3 +32,24 @@ export function formatText(domain, findings) {
 export function nextStepHint(domain) {
   return `Next: continuous monitoring and change alerts for ${domain} → https://korantix.io/en?domain=${encodeURIComponent(domain)}`;
 }
+
+const worst = (c) => (c.fail + c.error > 0 ? 'FAIL' : c.warn > 0 ? 'WARN' : 'OK');
+
+// Multi-domain text report: every domain's full report, then one summary table. results: [{ domain, findings }]
+export function formatBatchText(results) {
+  const blocks = results.map((r) => formatText(r.domain, r.findings));
+  const width = Math.max(6, ...results.map((r) => r.domain.length));
+  const rows = results.map(({ domain, findings }) => {
+    const c = summarize(findings);
+    return `  ${domain.padEnd(width)}  ${String(c.fail).padStart(4)}  ${String(c.error).padStart(5)}  ${String(c.warn).padStart(4)}  ${String(c.pass).padStart(4)}  ${worst(c)}`;
+  });
+  const total = summarize(results.flatMap((r) => r.findings));
+  return [
+    blocks.join('\n\n----\n\n'),
+    '',
+    `Batch summary: ${results.length} domain(s)`,
+    `  ${'DOMAIN'.padEnd(width)}  ${'FAIL'.padStart(4)}  ${'ERROR'.padStart(5)}  ${'WARN'.padStart(4)}  ${'PASS'.padStart(4)}  RESULT`,
+    ...rows,
+    `  ${'TOTAL'.padEnd(width)}  ${String(total.fail).padStart(4)}  ${String(total.error).padStart(5)}  ${String(total.warn).padStart(4)}  ${String(total.pass).padStart(4)}  ${worst(total)}`,
+  ].join('\n');
+}
